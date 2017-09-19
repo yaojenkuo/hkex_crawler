@@ -8,7 +8,7 @@ single_page_crawler <- function(url) {
   cols_css <- paste0("#grdPaging .tbCell:nth-child(", 1:11, ")")
   res_list <- list(form_serial_no = c(),
                    date_of_relevant_event = c(),
-                   name_of_listed_coporation = c(),
+                   name_of_listed_corporation = c(),
                    name_of_substantial_shareholder = c(),
                    reason_for_disclosure = c(),
                    no_of_shares_bought_sold = c(),
@@ -96,52 +96,110 @@ get_urls <- function(start_date_chr, end_date_chr) {
   }
 }
 
-# Function: multiple_page_crawler()
-multiple_page_crawler <- function(start_date, end_date) {
-  urls <- get_urls(start_date, end_date)
-  if (class(urls) == "list") {
-    # old urls
-    old_url <- urls$old_url
-    
-    # new urls
-    new_url <- urls$new_url
-    
-  } else {
-    # get record counts
-    url_doc <- read_html(urls)
-    record_cnt_css <- "#lblRecCount"
-    record_cnt <- url_doc %>%
-      html_nodes(css = record_cnt_css) %>%
-      html_text() %>%
-      as.integer
-    
-    final_res_list <- list(
-      form_serial_no = c(),
-      date_of_relevant_event = c(),
-      name_of_listed_coporation = c(),
-      name_of_substantial_shareholder = c(),
-      reason_for_disclosure = c(),
-      no_of_shares_bought_sold = c(),
-      avg_price_per_share = c(),
-      no_of_shares_interested = c(),
-      percentage_of_issued_share_capital = c(),
-      interests_in_shares_of_associated_corp = c(),
-      interests_in_debentures = c()
-    )
-    
-    # loop through all records
-    for (i in 1:length(url_page_n)) {
-      page_url <- url_page_n[i]
-      page_n_list <- single_page_crawler(page_url)
-      for (j in names(final_res_list)) {
-        final_res_list[[j]] <- c(final_res_list[[j]], page_n_list[[j]])
-      }
-    }
-    return(final_res_list)
-  }
+# Function: get_stock_code()
+get_stock_code <- function(listed_corp_name, start_date_chr, end_date_chr) {
+  stock_code_query_url <- "http://sdinotice.hkex.com.hk/di/NSSrchCorpList.aspx?sa1=cl&scsd=%s/%s/%s&sced=%s/%s/%s&srchCorpName=%s&cn=1&src=MAIN&lang=EN"
+  start_date <- unlist(strsplit(start_date_chr, split = "-"))
+  end_date <- unlist(strsplit(end_date_chr, split = "-"))
+  listed_corp_name <- gsub(pattern = "\\s", listed_corp_name, replacement = "+")
+  stock_code_query_url <- sprintf(stock_code_query_url, start_date[3], start_date[2], start_date[1], end_date[3], end_date[2], end_date[1], listed_corp_name)
+  stock_code <- read_html(stock_code_query_url) %>%
+    html_nodes(css = ".tbCell:nth-child(1)") %>%
+    html_text()
+  return(stock_code)
 }
 
-# Call functions
-target_url <- "http://sdinotice.hkex.com.hk/di/NSAllFormDateList.aspx?sa1=da&scsd=18/03/2016&sced=18/04/2017&src=MAIN&lang=EN"
-result <- share_dis_crawler(target_url)
-test <- get_urls("2017-07-03", "2017-07-04")
+# Function: multiple_page_crawler()
+multiple_page_crawler <- function(start_date, end_date) {
+  # get_urls() is called here
+  urls_to_crawl <- get_urls(start_date, end_date)
+  final_res_list <- list(
+    form_serial_no = c(),
+    date_of_relevant_event = c(),
+    name_of_listed_corporation = c(),
+    name_of_substantial_shareholder = c(),
+    reason_for_disclosure = c(),
+    no_of_shares_bought_sold = c(),
+    avg_price_per_share = c(),
+    no_of_shares_interested = c(),
+    percentage_of_issued_share_capital = c(),
+    interests_in_shares_of_associated_corp = c(),
+    interests_in_debentures = c()
+  )
+  # loop through all records, single_page_crawler() is called here
+  for (i in 1:length(urls_to_crawl)) {
+    page_url <- urls_to_crawl[i]
+    page_n_list <- single_page_crawler(page_url)
+    for (j in names(final_res_list)) {
+      final_res_list[[j]] <- c(final_res_list[[j]], page_n_list[[j]])
+    }
+  }
+  
+  # make a df
+  df <- data.frame(
+    form_serial_no = final_res_list$form_serial_no,
+    date_of_relevant_event = final_res_list$date_of_relevant_event,
+    name_of_listed_corporation = final_res_list$name_of_listed_corporation,
+    name_of_substantial_shareholder = final_res_list$name_of_substantial_shareholder,
+    reason_for_disclosure = final_res_list$reason_for_disclosure,
+    no_of_shares_bought_sold = final_res_list$no_of_shares_bought_sold,
+    avg_price_per_share = final_res_list$avg_price_per_share,
+    no_of_shares_interested = final_res_list$no_of_shares_interested,
+    percentage_of_issued_share_capital = final_res_list$percentage_of_issued_share_capital,
+    interests_in_shares_of_associated_corp = final_res_list$interests_in_shares_of_associated_corp,
+    interests_in_debentures = final_res_list$interests_in_debentures,
+    stringsAsFactors = FALSE
+  )
+  
+  # make a clean df
+  # if avg_price_per_share is empty then delete that row
+  avg_price_per_share_starts_w_space <- grepl(pattern = "^\\s", df$avg_price_per_share)
+  clean_df <- df[!avg_price_per_share_starts_w_space, ]
+  
+  # split currency and amount
+  #currency_amount <- unlist(strsplit(clean_df$avg_price_per_share, split = "\\s"))
+  #currency <- c()
+  #amount <- c()
+  #for (i in 1:length(currency_amount)) {
+    #if (i %% 2 == 1) {
+      #currency <- c(currency, currency_amount[i])
+    #} else {
+      #amount <- c(amount, currency_amount[i])
+    #}
+  #}
+  #clean_df$avg_price_per_share_currency <- currency
+  #clean_df$avg_price_per_share_num <- as.numeric(amount)
+  
+  # keep the Long only data rows
+  short_lending_pool_pattern <- "(S)|(P)"
+  is_short_or_lending_pool <- grepl(pattern = short_lending_pool_pattern, clean_df$no_of_shares_interested) # confirm which column to be used
+  clean_df <- clean_df[!is_short_or_lending_pool, ]
+  
+  # get_stock_code() is called here
+  unique_names_of_listed_corps <- unique(clean_df$name_of_listed_corporation)
+  stock_codes <- c()
+  for (uniq_name in unique_names_of_listed_corps) {
+    stock_code <- get_stock_code(uniq_name, start_date, end_date)
+    if (identical(stock_code, character(0))) {
+      stock_codes <- c(stock_codes, NA)
+    } else {
+      stock_codes <- c(stock_codes, stock_code)
+    }
+  }
+  stock_code_ref_df <- data.frame(
+    unique_names_of_listed_corps = unique_names_of_listed_corps,
+    stock_codes = stock_codes
+  )
+  
+  # merge clean_df with stock_code_ref_df
+  clean_df_w_stock_codes <- merge(clean_df, stock_code_ref_df, by.x = "name_of_listed_corporation", by.y = "unique_names_of_listed_corps", all.x = TRUE)
+  
+  # create return object
+  # final_res_list is the original data stored in a list
+  # clean_df is the cleaned data stored in a dataframe
+  return_object <- list(
+    original_disclosure_list = final_res_list,
+    clean_disclosure_df = clean_df_w_stock_codes
+  )
+  return(return_object)
+}
