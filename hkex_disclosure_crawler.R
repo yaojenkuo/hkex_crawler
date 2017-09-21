@@ -120,20 +120,12 @@ get_stock_code <- function(listed_corp_name, start_date_chr, end_date_chr) {
 get_ohlc_on_specific_date <- function(stock_code, specific_date) {
   stock_code_w_hk <- paste0(stock_code, ".HK")
   tryCatch({
-    xts_obj <- getSymbols(stock_code_w_hk, from = specific_date, to = specific_date, env = NULL)
+    xts_obj <- suppressWarnings(getSymbols(stock_code_w_hk, from = specific_date, to = specific_date, env = NULL, warnings = FALSE))
     ohlc_ls <- list(
       ohlc_open = as.numeric(xts_obj[, 1]),
       ohlc_high = as.numeric(xts_obj[, 2]),
       ohlc_low = as.numeric(xts_obj[, 3]),
       ohlc_close = as.numeric(xts_obj[, 4])
-    )
-    return(ohlc_ls)
-  }, warning = function(w) {
-    ohlc_ls <- list(
-      ohlc_open = NA,
-      ohlc_high = NA,
-      ohlc_low = NA,
-      ohlc_close = NA
     )
     return(ohlc_ls)
   }, error = function(e) {
@@ -154,18 +146,11 @@ get_52_week_info <- function(stock_code, specific_date) {
   from_date <- specific_date_format - 52*7
   from_date <- as.character(from_date)
   tryCatch({
-    xts_obj <- getSymbols(stock_code_w_hk, from = from_date, env = NULL)
+    xts_obj <- suppressWarnings(getSymbols(stock_code_w_hk, from = from_date, env = NULL, warnings = FALSE))
     fifty_two_week <- list(
       fifty_two_week_high = max(as.numeric(xts_obj[, 2]), na.rm = TRUE),
       fifty_two_week_low = min(as.numeric(xts_obj[, 3]), na.rm = TRUE),
       fifty_two_week_volume = mean(as.numeric(xts_obj[, 5]), na.rm = TRUE)
-    )
-    return(fifty_two_week)
-  }, warning = function(w) {
-    fifty_two_week <- list(
-      fifty_two_week_high = NA,
-      fifty_two_week_low = NA,
-      fifty_two_week_volume = NA
     )
     return(fifty_two_week)
   }, error = function(e) {
@@ -286,16 +271,18 @@ multiple_page_crawler <- function(start_date, end_date) {
   clean_df_w_stock_codes$stock_codes <- substr(clean_df_w_stock_codes$stock_codes, start = 2, stop = 5)
   
   # get_ohlcs_on_specific_dates() is applied here
-  #mapply_res_mat <- t(mapply(FUN = get_ohlc_on_specific_date, clean_df_w_stock_codes$stock_codes, clean_df_w_stock_codes$date_of_relevant_event))
-  #ohlc_df <- data.frame(mapply_res_mat)
-  #clean_df_w_stock_codes <- cbind(clean_df_w_stock_codes, ohlc_df)
-  #clean_df_w_stock_codes$diff_avg_price_per_share_open_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_open) / clean_df_w_stock_codes$ohlc_open
-  #clean_df_w_stock_codes$diff_avg_price_per_share_close_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_close) / clean_df_w_stock_codes$ohlc_open
+  mapply_res_mat <- t(mapply(FUN = get_ohlc_on_specific_date, clean_df_w_stock_codes$stock_codes, clean_df_w_stock_codes$date_of_relevant_event))
+  mapply_res_mat <- apply(mapply_res_mat, FUN = unlist, MARGIN = 2)
+  ohlc_df <- data.frame(mapply_res_mat, row.names = NULL)
+  clean_df_w_stock_codes <- cbind(clean_df_w_stock_codes, ohlc_df)
+  clean_df_w_stock_codes$diff_avg_price_per_share_open_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_open) / clean_df_w_stock_codes$ohlc_open
+  clean_df_w_stock_codes$diff_avg_price_per_share_close_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_close) / clean_df_w_stock_codes$ohlc_open
   
   # get_52_week_info() is applied here
-  #mapply_res_mat <- t(mapply(FUN = get_52_week_info, clean_df_w_stock_codes$stock_codes, clean_df_w_stock_codes$date_of_relevant_event))
-  #fifty_two_week_df <- as.data.frame(mapply_res_mat, row.names = NULL)
-  #clean_df_w_stock_codes <- cbind(clean_df_w_stock_codes, fifty_two_week_df)
+  mapply_res_mat <- t(mapply(FUN = get_52_week_info, clean_df_w_stock_codes$stock_codes, clean_df_w_stock_codes$date_of_relevant_event))
+  mapply_res_mat <- apply(mapply_res_mat, FUN = unlist, MARGIN = 2)
+  fifty_two_week_df <- data.frame(mapply_res_mat, row.names = NULL)
+  clean_df_w_stock_codes <- cbind(clean_df_w_stock_codes, fifty_two_week_df)
   
   # create return object
   # final_res_list is the original data stored in a list
