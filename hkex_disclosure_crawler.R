@@ -275,8 +275,13 @@ multiple_page_crawler <- function(start_date, end_date) {
   mapply_res_mat <- apply(mapply_res_mat, FUN = unlist, MARGIN = 2)
   ohlc_df <- data.frame(mapply_res_mat, row.names = NULL)
   clean_df_w_stock_codes <- cbind(clean_df_w_stock_codes, ohlc_df)
-  clean_df_w_stock_codes$diff_avg_price_per_share_open_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_open) / clean_df_w_stock_codes$ohlc_open
-  clean_df_w_stock_codes$diff_avg_price_per_share_close_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_close) / clean_df_w_stock_codes$ohlc_open
+  # remove rows without ohlc_low
+  clean_df_w_stock_codes <- clean_df_w_stock_codes[!(is.na(clean_df_w_stock_codes$ohlc_low)), ]
+  # remove rows whose avg_price_per_share is lower than ohlc_low
+  clean_df_w_stock_codes <- clean_df_w_stock_codes[!(clean_df_w_stock_codes$avg_price_per_share < clean_df_w_stock_codes$ohlc_low), ]
+  #clean_df_w_stock_codes$diff_avg_price_per_share_open_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_open) / clean_df_w_stock_codes$ohlc_open
+  #clean_df_w_stock_codes$diff_avg_price_per_share_close_price <- (clean_df_w_stock_codes$avg_price_per_share - clean_df_w_stock_codes$ohlc_close) / clean_df_w_stock_codes$ohlc_open
+  
   
   # get_52_week_info() is applied here
   mapply_res_mat <- t(mapply(FUN = get_52_week_info, clean_df_w_stock_codes$stock_codes, clean_df_w_stock_codes$date_of_relevant_event))
@@ -287,9 +292,9 @@ multiple_page_crawler <- function(start_date, end_date) {
   # create return object
   # final_res_list is the original data stored in a list
   # clean_df is the cleaned data stored in a dataframe
-  return_object <- list(
-    original_disclosure_list = final_res_list,
-    clean_disclosure_df = clean_df_w_stock_codes
-  )
-  return(return_object)
+  #return_object <- list(
+    #original_disclosure_list = final_res_list,
+    #clean_disclosure_df = clean_df_w_stock_codes
+  #)
+  return(clean_df_w_stock_codes)
 }
