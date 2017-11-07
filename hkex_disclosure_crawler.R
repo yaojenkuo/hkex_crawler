@@ -252,13 +252,13 @@ multiple_page_crawler <- function(start_date, end_date) {
 
   # get_stock_code() is called here
   unique_names_of_listed_corps <- unique(clean_df$name_of_listed_corporation)
-  stock_codes <- c()
-  for (uniq_name in unique_names_of_listed_corps) {
-    stock_code <- get_stock_code(uniq_name, start_date, end_date)
+  stock_codes <- rep(NA, times = length(unique_names_of_listed_corps))
+  for (i in 1:length(unique_names_of_listed_corps)) {
+    stock_code <- get_stock_code(unique_names_of_listed_corps[i], start_date, end_date)
     if (identical(stock_code, character(0))) {
-      stock_codes <- c(stock_codes, NA)
+      stock_codes[i] <- NA
     } else {
-      stock_codes <- c(stock_codes, stock_code)
+      stock_codes[i] <- stock_code
     }
   }
   stock_code_ref_df <- data.frame(
@@ -288,6 +288,9 @@ multiple_page_crawler <- function(start_date, end_date) {
   mapply_res_mat <- apply(mapply_res_mat, FUN = unlist, MARGIN = 2)
   fifty_two_week_df <- data.frame(mapply_res_mat, row.names = NULL)
   clean_df_w_stock_codes <- cbind(clean_df_w_stock_codes, fifty_two_week_df)
+  
+  # Arrange columns
+  clean_df_w_stock_codes <- clean_df_w_stock_codes[, c("stock_codes", "name_of_listed_corporation", "date_of_relevant_event", "name_of_substantial_shareholder", "reason_for_disclosure", "no_of_shares_bought_sold", "avg_price_per_share", "no_of_shares_interested", "percentage_of_issued_share_capital", "ohlc_open", "ohlc_high", "ohlc_low", "ohlc_close", "fifty_two_week_high", "fifty_two_week_low", "fifty_two_week_volume")]
   
   # create return object
   # final_res_list is the original data stored in a list
