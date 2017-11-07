@@ -35,18 +35,30 @@ relevant_date_2yr <- as.Date(relevant_date_2yr)
 relevant_date <- relevant_date[!(relevant_date_2yr >= Sys.Date() - 1)]
 unique_stock_code <- unique_stock_code[!(relevant_date_2yr >= Sys.Date() - 1)]
 relevant_dates_lst <- list(
-  relevant_date_1q = c(),
   relevant_date_2q = c(),
-  relevant_date_3q = c(),
   relevant_date_4q = c(),
-  relevant_date_5q = c(),
   relevant_date_6q = c(),
-  relevant_date_7q = c(),
   relevant_date_8q = c()
 )
 for (i in 1:length(relevant_date)) {
-  time_points <- seq(relevant_date[i], length.out = 9, by = "quarter")
-  for (j in 1:8) {
+  time_points <- seq(relevant_date[i], length.out = 5, by = "6 months")
+  for (j in 1:4) {
     relevant_dates_lst[[j]] <- c(relevant_dates_lst[[j]], time_points[j + 1])
+  }
+}
+backtest_price_lst <- list(
+  backtest_price_2q = c(),
+  backtest_price_4q = c(),
+  backtest_price_6q = c(),
+  backtest_price_8q = c()
+)
+for (i in 1:length(unique_stock_code)) {
+  for (j in 1:length(relevant_dates_lst)) {
+    tryCatch({
+      xts_obj <- suppressWarnings(getSymbols(unique_stock_code[i], from = as.Date(relevant_dates_lst[[j]][i]), to = as.Date(relevant_dates_lst[[j]][i]), env = NULL, warnings = FALSE))
+      backtest_price_lst[[j]] <- c(backtest_price_lst[[j]], xts_obj[, 4])
+    }, error = function(e) {
+      backtest_price_lst[[j]] <- c(backtest_price_lst[[j]], NA)
+    })
   }
 }
